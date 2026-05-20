@@ -51,6 +51,13 @@ export default function useWebRTC(roomId: string, userName: string) {
   const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
   const socket = useRef<Socket | null>(null);
 
+  const addParticipant = useCallback((p: Participant) => {
+    setParticipants((prev) => {
+      if (prev.some((x) => x.id === p.id)) return prev;
+      return [...prev, p];
+    });
+  }, []);
+
   const sendSignal = useCallback((to: string, signal: unknown) => {
     socket.current?.emit("signal", { to, signal });
   }, []);
@@ -122,23 +129,15 @@ export default function useWebRTC(roomId: string, userName: string) {
 
       setConnectionStatus("connected");
 
-      s.on("room-users", async ({ participants: existingUsers }: { participants: Array<{ id: string; name: string }> }) => {
-        if (!stream) return;
+      s.on("room-users", ({ participants: existingUsers }: { participants: Array<{ id: string; name: string }> }) => {
         for (const user of existingUsers) {
-          setParticipants((prev) => [
-            ...prev,
-            { id: user.id, name: user.name, stream: null },
-          ]);
-          const pc = await createPeerConnection(user.id, stream);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          sendSignal(user.id, { type: "offer", sdp: pc.localDescription });
+          addParticipant({ id: user.id, name: user.name, stream: null });
         }
       });
 
       s.on("user-joined", async ({ id, name }: { id: string; name: string }) => {
         if (!stream) return;
-        setParticipants((prev) => [...prev, { id, name, stream: null }]);
+        addParticipant({ id, name, stream: null });
         const pc = await createPeerConnection(id, stream);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -155,6 +154,14 @@ export default function useWebRTC(roomId: string, userName: string) {
 
       s.on("signal", async ({ from, signal }: { from: string; signal: any }) => {
         if (signal.type === "offer") {
+          const existingPc = peerConnections.current[from];
+          if (existingPc) {
+            if (existingPc.signalingState === "have-local-offer") {
+              await existingPc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
+            } else {
+              existingPc.close();
+            }
+          }
           const pc = await createPeerConnection(from, stream);
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           const answer = await pc.createAnswer();
@@ -162,7 +169,7 @@ export default function useWebRTC(roomId: string, userName: string) {
           sendSignal(from, { type: "answer", sdp: pc.localDescription });
         } else if (signal.type === "answer") {
           const pc = peerConnections.current[from];
-          if (pc) {
+          if (pc && pc.signalingState === "have-local-offer") {
             await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           }
         } else if (signal.type === "ice-candidate") {
@@ -234,19 +241,16 @@ export default function useWebRTC(roomId: string, userName: string) {
 
   const addLocalParticipant = useCallback(
     (stream: MediaStream) => {
-      setParticipants((prev) => [
-        {
-          id: "local",
-          name: userName || "You",
-          stream,
-          isLocal: true,
-          cameraEnabled: true,
-          micEnabled: true,
-        },
-        ...prev,
-      ]);
+      addParticipant({
+        id: "local",
+        name: userName || "You",
+        stream,
+        isLocal: true,
+        cameraEnabled: true,
+        micEnabled: true,
+      });
     },
-    [userName],
+    [userName, addParticipant],
   );
 
   const toggleCamera = useCallback(() => {

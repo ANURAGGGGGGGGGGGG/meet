@@ -34,10 +34,16 @@ io.on("connection", (socket) => {
     }
 
     socket.join(roomId);
-    rooms[roomId].participants.push({
-      id: socket.id,
-      name: participantName,
-    });
+
+    const existing = rooms[roomId].participants.find((p) => p.id === socket.id);
+    if (!existing) {
+      rooms[roomId].participants.push({
+        id: socket.id,
+        name: participantName,
+      });
+    } else {
+      existing.name = participantName;
+    }
 
     socket.to(roomId).emit("user-joined", {
       id: socket.id,
