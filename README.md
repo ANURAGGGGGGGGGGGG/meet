@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MeetFlow — Peer-to-Peer Video Calls
+
+A Google Meet–like video calling app built with **Next.js**, **WebRTC**, and **Socket.IO**. Fully peer-to-peer, no third-party media relay, free to run.
+
+## Features
+
+- **End-to-end video & audio** — P2P via WebRTC, no media touches the server
+- **Room-based meetings** — unique 8-char codes, shareable invite links
+- **Camera & mic controls** — toggle on/off during a call
+- **Screen sharing** — share your screen with all participants
+- **In-call chat** — text messaging alongside the video feed
+- **Responsive grid layout** — adapts from 1 to 3+ columns (mobile → desktop)
+- **Connection status** — shows connecting state and media permission errors
+- **Dark mode UI** — Tailwind CSS, dark-first design
+- **Lightweight signaling** — Socket.IO only for room management & ICE exchange
+
+## Architecture
+
+```
+Browser A ←——RTCPeerConnection——→ Browser B
+     ↕                              ↕
+Socket.IO  ←— signaling (offers/answers/ICE) —→ Socket.IO
+    │                                          │
+    └────────── Room management ───────────────┘
+```
+
+- **Signaling server** (`server/index.js`): Express + Socket.IO on port `3001`
+- **Next.js app** (port `3000`): React frontend + API routes (`/api/create-room`)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Install
+
+```bash
+cd server && npm install
+cd ..
+npm install
+```
+
+### Run
+
+Starts both Next.js (port 3000) and the signaling server (port 3001):
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Or separately:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev:next    # Next.js on :3000
+npm run dev:signal  # Signaling on :3001
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+1. Enter your name on the landing page
+2. Click **New Meeting** to create a room, or paste a room code and click **Join**
+3. Allow camera/microphone access when prompted
+4. Share the invite link (via the **Copy Link** button) so others can join
+5. Use the bottom toolbar to mute, stop camera, share screen, open chat, or leave
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16, React 19 |
+| Styling | Tailwind CSS 4 |
+| Signaling | Socket.IO |
+| Media | WebRTC (RTCPeerConnection + getUserMedia) |
+| ICE | Google STUN (no TURN) |
+| Language | TypeScript |
 
-## Deploy on Vercel
+## Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **STUN only** — calls work on the same network or with compatible NAT. For production, add a TURN server.
+- No media is recorded or stored. Chat messages are ephemeral (in-memory on the signaling server).
+- Works best in Chrome, Firefox, and Edge. Safari has limited screen-share support.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT
