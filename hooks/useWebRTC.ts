@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Socket } from "socket.io-client";
 import { getSocket } from "@/lib/socket";
+import { v4 as uuidv4 } from "uuid";
 
 const ICE_SERVERS = {
   iceServers: [
@@ -30,6 +31,7 @@ export type Participant = {
 };
 
 export type Message = {
+  id: string;
   senderId: string;
   senderName: string;
   message: string;
@@ -58,6 +60,7 @@ export default function useWebRTC(roomId: string, userName: string) {
   const screenStream = useRef<MediaStream | null>(null);
   const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
   const socket = useRef<Socket | null>(null);
+  const listenersAttached = useRef(false);
 
   const addParticipant = useCallback((p: Participant) => {
     setParticipants((prev) => {
@@ -70,11 +73,17 @@ export default function useWebRTC(roomId: string, userName: string) {
     socket.current?.emit("signal", { to, signal });
   }, []);
 
-  async function createPeerConnection(targetId: string, stream: MediaStream | null) {
+  async function getOrCreatePeerConnection(targetId: string, stream: MediaStream | null) {
+    const existing = peerConnections.current[targetId];
+    if (existing && existing.connectionState !== "closed") {
+      return existing;
+    }
+
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
+        console.log("ICE candidate:", e.candidate.candidate);
         sendSignal(targetId, {
           type: "ice-candidate",
           candidate: e.candidate,
@@ -82,18 +91,21 @@ export default function useWebRTC(roomId: string, userName: string) {
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log(`ICE state [${targetId}]:`, pc.iceConnectionState);
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log(`Connection state [${targetId}]:`, pc.connectionState);
+    };
+
     pc.ontrack = (e) => {
-      setParticipants((prev) => {
-        const existing = prev.find((p) => p.id === targetId);
-        if (existing) {
-          return prev.map((p) =>
-            p.id === targetId ? { ...p, stream: e.streams[0] } : p,
-          );
-        }
-        return prev.map((p) =>
+      console.log(`Track received [${targetId}]:`, e.track.kind);
+      setParticipants((prev) =>
+        prev.map((p) =>
           p.id === targetId ? { ...p, stream: e.streams[0] } : p,
-        );
-      });
+        ),
+      );
     };
 
     if (stream) {
@@ -126,17 +138,11 @@ export default function useWebRTC(roomId: string, userName: string) {
     socket.current = s;
 
     async function init() {
-      const stream = await startLocalMedia();
+      if (listenersAttached.current) return;
+      listenersAttached.current = true;
 
-      s.emit("join-room", { roomId, name: userName });
-
-      if (!stream) {
-        setConnectionStatus("no-media");
-        return;
-      }
-
-      setConnectionStatus("connected");
-
+      // Register all event listeners BEFORE emitting join-room
+      // so we never miss events like room-users
       s.on("room-users", ({ participants: existingUsers }: { participants: Array<{ id: string; name: string }> }) => {
         for (const user of existingUsers) {
           addParticipant({ id: user.id, name: user.name, stream: null });
@@ -144,9 +150,13 @@ export default function useWebRTC(roomId: string, userName: string) {
       });
 
       s.on("user-joined", async ({ id, name }: { id: string; name: string }) => {
-        if (!stream) return;
         addParticipant({ id, name, stream: null });
-        const pc = await createPeerConnection(id, stream);
+        // Skip if a PC already exists for this peer (signal handler may have
+        // created one first, avoiding a race between the two async handlers)
+        if (peerConnections.current[id]) return;
+        const stream = localStream.current;
+        if (!stream) return;
+        const pc = await getOrCreatePeerConnection(id, stream);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         sendSignal(id, { type: "offer", sdp: pc.localDescription });
@@ -161,16 +171,22 @@ export default function useWebRTC(roomId: string, userName: string) {
       });
 
       s.on("signal", async ({ from, signal }: { from: string; signal: any }) => {
+        const stream = localStream.current;
+        if (!stream) return;
+
         if (signal.type === "offer") {
-          const existingPc = peerConnections.current[from];
-          if (existingPc) {
-            if (existingPc.signalingState === "have-local-offer") {
-              await existingPc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
-            } else {
-              existingPc.close();
-            }
+          // Ensure the participant exists in state even if room-users was missed
+          setParticipants((prev) => {
+            if (prev.some((p) => p.id === from)) return prev;
+            return [...prev, { id: from, name: from, stream: null }];
+          });
+
+          const pc = await getOrCreatePeerConnection(from, stream);
+          // Only proceed if we're in the right state for receiving an offer
+          if (pc.signalingState !== "stable" && pc.signalingState !== "have-local-offer") return;
+          if (pc.signalingState === "have-local-offer") {
+            await pc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
           }
-          const pc = await createPeerConnection(from, stream);
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -193,7 +209,10 @@ export default function useWebRTC(roomId: string, userName: string) {
       });
 
       s.on("receive-message", (data: Message) => {
-        setMessages((prev) => [...prev, data]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.id)) return prev;
+          return [...prev, data];
+        });
       });
 
       s.on("participant-camera-toggled", ({ id, enabled }: { id: string; enabled: boolean }) => {
@@ -219,11 +238,23 @@ export default function useWebRTC(roomId: string, userName: string) {
           prev.map((p) => (p.id === id ? { ...p, sharingScreen: false } : p)),
         );
       });
+
+      // Now request media and join the room
+      const stream = await startLocalMedia();
+      s.emit("join-room", { roomId, name: userName });
+
+      if (!stream) {
+        setConnectionStatus("no-media");
+        return;
+      }
+
+      setConnectionStatus("connected");
     }
 
     init();
 
     return () => {
+      listenersAttached.current = false;
       s.off("room-users");
       s.off("user-joined");
       s.off("user-left");
@@ -325,10 +356,12 @@ export default function useWebRTC(roomId: string, userName: string) {
   const sendMessage = useCallback(
     (text: string) => {
       if (!text.trim()) return;
-      socket.current?.emit("send-message", { roomId, message: text });
+      const id = uuidv4();
+      socket.current?.emit("send-message", { roomId, message: text, id });
       setMessages((prev) => [
         ...prev,
         {
+          id,
           senderId: "local",
           senderName: "You",
           message: text,

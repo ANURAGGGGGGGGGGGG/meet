@@ -10,7 +10,7 @@ const httpServer = createServer(app);
 
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(",")
-  : ["http://localhost:3000"];
+  : ["http://localhost:3000", "https://meet-eta-fawn.vercel.app"];
 
 const io = new Server(httpServer, {
   cors: {
@@ -65,12 +65,13 @@ io.on("connection", (socket) => {
     io.to(to).emit("signal", { from: socket.id, signal });
   });
 
-  socket.on("send-message", ({ roomId, message }) => {
+  socket.on("send-message", ({ roomId, message, id }) => {
     const room = rooms[roomId];
     if (!room) return;
     const participant = room.participants.find((p) => p.id === socket.id);
     const name = participant ? participant.name : "Anonymous";
-    io.to(roomId).emit("receive-message", {
+    socket.to(roomId).emit("receive-message", {
+      id,
       senderId: socket.id,
       senderName: name,
       message,

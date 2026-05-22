@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import useWebRTC from "@/hooks/useWebRTC";
+import useWebRTC, { type Message } from "@/hooks/useWebRTC";
+import { usePiPAuto } from "@/hooks/usePiPAuto";
 import VideoTile from "@/components/VideoTile";
 import Controls from "@/components/Controls";
 import Chat from "@/components/Chat";
+import MessagePopup from "@/components/MessagePopup";
 import { disconnectSocket } from "@/lib/socket";
 
 export default function Room() {
@@ -16,6 +18,8 @@ export default function Room() {
   const userName = searchParams.get("name") || "Anonymous";
   const [showChat, setShowChat] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [popupMessages, setPopupMessages] = useState<Message[]>([]);
 
   const {
     participants,
@@ -32,6 +36,18 @@ export default function Room() {
   } = useWebRTC(roomId, userName);
 
   const hasAddedLocal = useRef(false);
+  const prevMessagesLen = useRef(0);
+
+  useEffect(() => {
+    if (messages.length > prevMessagesLen.current) {
+      if (!showChat) {
+        const newMessages = messages.slice(prevMessagesLen.current);
+        setUnreadCount((c) => c + newMessages.length);
+        setPopupMessages((prev) => [...prev, ...newMessages].slice(-3));
+      }
+    }
+    prevMessagesLen.current = messages.length;
+  }, [messages, showChat]);
 
   useEffect(() => {
     if (localStream.current && !hasAddedLocal.current) {
@@ -45,6 +61,11 @@ export default function Room() {
       setConnectionError(true);
     }
   }, [connectionStatus]);
+
+  usePiPAuto({
+    participants,
+    enabled: connectionStatus === "connected" && participants.length > 0,
+  });
 
   const handleLeave = useCallback(() => {
     leaveRoom();
@@ -118,10 +139,11 @@ export default function Room() {
             toggleMic={toggleMic}
             toggleScreenShare={toggleScreenShare}
             showChat={showChat}
-            setShowChat={setShowChat}
+            setShowChat={(v) => { setShowChat(v); if (v) setUnreadCount(0); }}
             leaveRoom={handleLeave}
             copyInviteLink={copyInviteLink}
             participantCount={participants.length}
+            unreadCount={unreadCount}
           />
         </div>
 
@@ -130,6 +152,11 @@ export default function Room() {
             <Chat messages={messages} onSend={sendMessage} onClose={() => setShowChat(false)} />
           </div>
         )}
+
+        <MessagePopup
+          messages={popupMessages}
+          onDismiss={(id) => setPopupMessages((prev) => prev.filter((m) => m.id !== id))}
+        />
       </div>
     </div>
   );
