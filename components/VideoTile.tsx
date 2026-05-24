@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import type { Participant } from "@/hooks/useWebRTC";
 
 type Props = {
@@ -10,23 +10,11 @@ type Props = {
 };
 
 export default function VideoTile({ participant, isLocal, localStream }: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoMounted, setVideoMounted] = useState(false);
-
-  useEffect(() => {
-    if (!videoRef.current || videoMounted) return;
+  const videoRef = useCallback((node: HTMLVideoElement | null) => {
+    if (!node) return;
     const stream = isLocal ? localStream : participant.stream;
     if (stream) {
-      videoRef.current.srcObject = stream;
-      setVideoMounted(true);
-    }
-  }, [isLocal, localStream, participant.stream, videoMounted]);
-
-  useEffect(() => {
-    if (!videoRef.current) return;
-    const stream = isLocal ? localStream : participant.stream;
-    if (stream) {
-      videoRef.current.srcObject = stream;
+      node.srcObject = stream;
     }
   }, [isLocal, localStream, participant.stream]);
 

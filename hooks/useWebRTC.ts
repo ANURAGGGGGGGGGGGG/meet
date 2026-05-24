@@ -53,7 +53,7 @@ export default function useWebRTC(roomId: string, userName: string) {
     screen: false,
   });
   const [connectionStatus, setConnectionStatus] = useState<
-    "connecting" | "connected" | "no-media"
+    "connecting" | "connected" | "no-media" | "error"
   >("connecting");
 
   const localStream = useRef<MediaStream | null>(null);
@@ -137,8 +137,11 @@ export default function useWebRTC(roomId: string, userName: string) {
     const s = getSocket();
     socket.current = s;
 
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     async function init() {
       if (listenersAttached.current) return;
+      if (!roomId) return;
       listenersAttached.current = true;
 
       // Register all event listeners BEFORE emitting join-room
@@ -239,6 +242,16 @@ export default function useWebRTC(roomId: string, userName: string) {
         );
       });
 
+      // Handle socket connection errors
+      s.on("connect_error", () => {
+        setConnectionStatus("error");
+      });
+
+      // Timeout: if still connecting after 15s, show error
+      timeoutId = setTimeout(() => {
+        setConnectionStatus((prev) => (prev === "connecting" ? "error" : prev));
+      }, 15000);
+
       // Now request media and join the room
       const stream = await startLocalMedia();
       s.emit("join-room", { roomId, name: userName });
@@ -254,6 +267,8 @@ export default function useWebRTC(roomId: string, userName: string) {
     init();
 
     return () => {
+      clearTimeout(timeoutId);
+      s.off("connect_error");
       listenersAttached.current = false;
       s.off("room-users");
       s.off("user-joined");
