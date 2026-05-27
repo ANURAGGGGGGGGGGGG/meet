@@ -58,6 +58,7 @@ export default function useWebRTC(roomId: string, userName: string) {
 
   const localStream = useRef<MediaStream | null>(null);
   const screenStream = useRef<MediaStream | null>(null);
+  const screenSenders = useRef<Map<string, RTCRtpSender>>(new Map());
   const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
   const socket = useRef<Socket | null>(null);
   const listenersAttached = useRef(false);
@@ -101,11 +102,31 @@ export default function useWebRTC(roomId: string, userName: string) {
 
     pc.ontrack = (e) => {
       console.log(`Track received [${targetId}]:`, e.track.kind);
-      setParticipants((prev) =>
-        prev.map((p) =>
-          p.id === targetId ? { ...p, stream: e.streams[0] } : p,
-        ),
-      );
+      setParticipants((prev) => {
+        const existing = prev.find((p) => p.id === targetId);
+        const incoming = e.streams[0];
+        if (existing && existing.stream && existing.stream.id !== incoming.id) {
+          const screenId = `screen-${targetId}`;
+          const existingScreen = prev.find((p) => p.id === screenId);
+          if (existingScreen) {
+            return prev.map((p) =>
+              p.id === screenId ? { ...p, stream: incoming } : p,
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: screenId,
+              name: "Screen",
+              stream: incoming,
+              sharingScreen: true,
+            },
+          ];
+        }
+        return prev.map((p) =>
+          p.id === targetId ? { ...p, stream: incoming } : p,
+        );
+      });
     };
 
     if (stream) {
@@ -170,7 +191,9 @@ export default function useWebRTC(roomId: string, userName: string) {
           peerConnections.current[id].close();
           delete peerConnections.current[id];
         }
-        setParticipants((prev) => prev.filter((p) => p.id !== id));
+        setParticipants((prev) =>
+          prev.filter((p) => p.id !== id && p.id !== `screen-${id}`),
+        );
       });
 
       s.on("signal", async ({ from, signal }: { from: string; signal: any }) => {
@@ -231,14 +254,29 @@ export default function useWebRTC(roomId: string, userName: string) {
       });
 
       s.on("participant-screen-share-started", ({ id }: { id: string }) => {
-        setParticipants((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, sharingScreen: true } : p)),
-        );
+        setParticipants((prev) => {
+          const screenId = `screen-${id}`;
+          if (prev.some((p) => p.id === screenId)) {
+            return prev.map((p) =>
+              p.id === id ? { ...p, sharingScreen: true } : p,
+            );
+          }
+          return [
+            ...prev.map((p) =>
+              p.id === id ? { ...p, sharingScreen: true } : p,
+            ),
+            { id: screenId, name: "Screen", stream: null, sharingScreen: true },
+          ];
+        });
       });
 
       s.on("participant-screen-share-stopped", ({ id }: { id: string }) => {
         setParticipants((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, sharingScreen: false } : p)),
+          prev
+            .filter((p) => p.id !== `screen-${id}`)
+            .map((p) =>
+              p.id === id ? { ...p, sharingScreen: false } : p,
+            ),
         );
       });
 
@@ -327,6 +365,17 @@ export default function useWebRTC(roomId: string, userName: string) {
 
   const toggleScreenShare = useCallback(async (shareAudio?: boolean) => {
     if (mediaState.screen) {
+      for (const [peerId, sender] of screenSenders.current) {
+        const pc = peerConnections.current[peerId];
+        if (pc) {
+          pc.removeTrack(sender);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          sendSignal(peerId, { type: "offer", sdp: pc.localDescription });
+        }
+      }
+      screenSenders.current.clear();
+
       if (screenStream.current) {
         screenStream.current.getTracks().forEach((t) => t.stop());
       }
@@ -334,21 +383,7 @@ export default function useWebRTC(roomId: string, userName: string) {
       setMediaState((prev) => ({ ...prev, screen: false }));
       socket.current?.emit("screen-share-stopped", { roomId });
 
-      const videoTrack = localStream.current?.getVideoTracks()[0];
-      if (videoTrack) {
-        for (const pc of Object.values(peerConnections.current)) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-          if (sender) await sender.replaceTrack(videoTrack);
-        }
-      }
-
-      const micTrack = localStream.current?.getAudioTracks()[0];
-      if (micTrack) {
-        for (const pc of Object.values(peerConnections.current)) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-          if (sender) await sender.replaceTrack(micTrack);
-        }
-      }
+      setParticipants((prev) => prev.filter((p) => p.id !== "local-screen"));
     } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -360,10 +395,29 @@ export default function useWebRTC(roomId: string, userName: string) {
         socket.current?.emit("screen-share-started", { roomId });
 
         const screenTrack = stream.getVideoTracks()[0];
-        for (const pc of Object.values(peerConnections.current)) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-          if (sender) await sender.replaceTrack(screenTrack);
+        const screenMs = new MediaStream([screenTrack]);
+
+        for (const [peerId, pc] of Object.entries(peerConnections.current)) {
+          const sender = pc.addTrack(screenTrack, screenMs);
+          screenSenders.current.set(peerId, sender);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          sendSignal(peerId, { type: "offer", sdp: pc.localDescription });
         }
+
+        setParticipants((prev) => {
+          if (prev.some((p) => p.id === "local-screen")) return prev;
+          return [
+            ...prev,
+            {
+              id: "local-screen",
+              name: "Your Screen",
+              stream,
+              isLocal: true,
+              sharingScreen: true,
+            },
+          ];
+        });
 
         if (shareAudio) {
           const screenAudio = stream.getAudioTracks()[0];
@@ -382,7 +436,7 @@ export default function useWebRTC(roomId: string, userName: string) {
         // user cancelled
       }
     }
-  }, [mediaState.screen, roomId]);
+  }, [mediaState.screen, roomId, sendSignal]);
 
   toggleScreenShareRef.current = toggleScreenShare;
 
