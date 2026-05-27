@@ -68,6 +68,7 @@ export default function VideoTile({ participant, isLocal, localStream, enableAut
       if (results.detections.length > 0) {
         const face = results.detections[0];
         const box = face.boundingBox;
+        if (!box) return;
         const scale = video.clientWidth / video.videoWidth;
         let centerX = (box.originX + box.width / 2) * scale;
         if (isLocal) centerX = video.clientWidth - centerX;
