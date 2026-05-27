@@ -23,6 +23,7 @@ export default function Room() {
   const initialName = searchParams.get("name") || "";
   const [userName, setUserName] = useState(initialName);
   const [joined, setJoined] = useState(!!initialName);
+  const [autoFrame, setAutoFrame] = useState(false);
 
   const {
     participants,
@@ -189,7 +190,7 @@ export default function Room() {
           <div className="flex-1 p-3 overflow-y-auto">
             <div className={`grid gap-3 h-full ${participants.length <= 1 ? "grid-cols-1" : participants.length === 2 ? "grid-cols-1 md:grid-cols-2" : participants.length <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}>
               {participants.map((p) => (
-                <VideoTile key={p.id} participant={p} isLocal={p.isLocal} localStream={p.isLocal ? localStream.current : null} />
+                <VideoTile key={p.id} participant={p} isLocal={p.isLocal} localStream={p.isLocal ? localStream.current : null} enableAutoFrame={autoFrame && p.isLocal} />
               ))}
             </div>
           </div>
@@ -205,6 +206,8 @@ export default function Room() {
             copyInviteLink={copyInviteLink}
             participantCount={participants.length}
             unreadCount={unreadCount}
+            autoFrame={autoFrame}
+            toggleAutoFrame={() => setAutoFrame((v) => !v)}
           />
         </div>
 

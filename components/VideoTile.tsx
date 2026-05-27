@@ -1,22 +1,93 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import type { Participant } from "@/hooks/useWebRTC";
+import type { FaceDetector } from "@mediapipe/tasks-vision";
 
 type Props = {
   participant: Participant;
   isLocal?: boolean;
   localStream?: MediaStream | null;
+  enableAutoFrame?: boolean;
 };
 
-export default function VideoTile({ participant, isLocal, localStream }: Props) {
-  const videoRef = useCallback((node: HTMLVideoElement | null) => {
+export default function VideoTile({ participant, isLocal, localStream, enableAutoFrame }: Props) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const detectorRef = useRef<FaceDetector | null>(null);
+  const rafRef = useRef<number>(0);
+
+  const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
     if (!node) return;
     const stream = isLocal ? localStream : participant.stream;
     if (stream) {
       node.srcObject = stream;
     }
   }, [isLocal, localStream, participant.stream]);
+
+  useEffect(() => {
+    if (!isLocal || !enableAutoFrame) return;
+
+    const origError = console.error;
+    console.error = (...args: Parameters<typeof console.error>) => {
+      if (typeof args[0] === "string" && args[0].includes("TensorFlow Lite XNNPACK")) return;
+      origError.apply(console, args);
+    };
+
+    let cancelled = false;
+
+    const init = async () => {
+      const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
+
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+      );
+
+      if (cancelled) return;
+
+      detectorRef.current = await FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+        },
+        runningMode: "VIDEO",
+      });
+
+      if (!cancelled) loop();
+    };
+
+    const loop = () => {
+      const video = videoRef.current;
+      if (!video || !detectorRef.current) {
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      const results = detectorRef.current.detectForVideo(video, performance.now());
+
+      if (results.detections.length > 0) {
+        const face = results.detections[0];
+        const box = face.boundingBox;
+        const scale = video.clientWidth / video.videoWidth;
+        let centerX = (box.originX + box.width / 2) * scale;
+        if (isLocal) centerX = video.clientWidth - centerX;
+        const containerWidth = video.parentElement?.clientWidth ?? window.innerWidth;
+        const offset = containerWidth / 2 - centerX;
+        video.style.transform = `translateX(${offset}px)`;
+      }
+
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafRef.current);
+      detectorRef.current?.close();
+      console.error = origError;
+    };
+  }, [isLocal, enableAutoFrame]);
 
   const initials = participant.name
     ? participant.name
@@ -49,7 +120,7 @@ export default function VideoTile({ participant, isLocal, localStream }: Props) 
       ) : (
         <>
           <video
-            ref={videoRef}
+            ref={setVideoRef}
             autoPlay
             playsInline
             muted={isLocal}

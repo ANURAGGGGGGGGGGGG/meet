@@ -323,9 +323,9 @@ export default function useWebRTC(roomId: string, userName: string) {
     socket.current?.emit("toggle-mic", { roomId, enabled });
   }, [mediaState.mic, roomId]);
 
-  const toggleScreenShareRef = useRef<() => void>(() => {});
+  const toggleScreenShareRef = useRef<(shareAudio?: boolean) => void>(() => {});
 
-  const toggleScreenShare = useCallback(async () => {
+  const toggleScreenShare = useCallback(async (shareAudio?: boolean) => {
     if (mediaState.screen) {
       if (screenStream.current) {
         screenStream.current.getTracks().forEach((t) => t.stop());
@@ -341,11 +341,19 @@ export default function useWebRTC(roomId: string, userName: string) {
           if (sender) await sender.replaceTrack(videoTrack);
         }
       }
+
+      const micTrack = localStream.current?.getAudioTracks()[0];
+      if (micTrack) {
+        for (const pc of Object.values(peerConnections.current)) {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+          if (sender) await sender.replaceTrack(micTrack);
+        }
+      }
     } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
-          audio: false,
+          audio: shareAudio || false,
         });
         screenStream.current = stream;
         setMediaState((prev) => ({ ...prev, screen: true }));
@@ -355,6 +363,16 @@ export default function useWebRTC(roomId: string, userName: string) {
         for (const pc of Object.values(peerConnections.current)) {
           const sender = pc.getSenders().find((s) => s.track?.kind === "video");
           if (sender) await sender.replaceTrack(screenTrack);
+        }
+
+        if (shareAudio) {
+          const screenAudio = stream.getAudioTracks()[0];
+          if (screenAudio) {
+            for (const pc of Object.values(peerConnections.current)) {
+              const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+              if (sender) await sender.replaceTrack(screenAudio);
+            }
+          }
         }
 
         screenTrack.onended = () => {

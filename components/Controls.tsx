@@ -1,18 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import type { MediaState } from "@/hooks/useWebRTC";
 
 type Props = {
   mediaState: MediaState;
   toggleCamera: () => void;
   toggleMic: () => void;
-  toggleScreenShare: () => void;
+  toggleScreenShare: (shareAudio?: boolean) => void;
   showChat: boolean;
   setShowChat: (v: boolean) => void;
   leaveRoom: () => void;
   copyInviteLink: () => void;
   participantCount: number;
   unreadCount?: number;
+  autoFrame: boolean;
+  toggleAutoFrame: () => void;
 };
 
 export default function Controls({
@@ -25,8 +28,14 @@ export default function Controls({
   leaveRoom,
   copyInviteLink,
   unreadCount = 0,
+  autoFrame,
+  toggleAutoFrame,
 }: Props) {
+  const [shareAudio, setShareAudio] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+
   return (
+    <>
     <div className="px-4 py-3 bg-gray-900/80 backdrop-blur-md border-t border-gray-800">
       <div className="max-w-3xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
         <ControlButton
@@ -65,15 +74,35 @@ export default function Controls({
           )}
         </ControlButton>
 
+        <div className="flex flex-col items-center gap-1">
+          <ControlButton
+            active={mediaState.screen}
+            onClick={() => {
+              if (mediaState.screen) {
+                toggleScreenShare();
+              } else {
+                setShowShareDialog(true);
+              }
+            }}
+            label={mediaState.screen ? "Stop Share" : "Share Screen"}
+            activeColor="bg-gray-700 hover:bg-gray-600"
+            inactiveColor="bg-gray-700 hover:bg-gray-600"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </ControlButton>
+        </div>
+
         <ControlButton
-          active={mediaState.screen}
-          onClick={toggleScreenShare}
-          label={mediaState.screen ? "Stop Share" : "Share Screen"}
-          activeColor="bg-gray-700 hover:bg-gray-600"
+          active={autoFrame}
+          onClick={toggleAutoFrame}
+          label={autoFrame ? "Disable Auto Frame" : "Enable Auto Frame"}
+          activeColor="bg-blue-600 hover:bg-blue-700"
           inactiveColor="bg-gray-700 hover:bg-gray-600"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
           </svg>
         </ControlButton>
 
@@ -122,6 +151,56 @@ export default function Controls({
         </button>
       </div>
     </div>
+
+    {showShareDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Share Screen</h3>
+              <p className="text-sm text-gray-400">Choose what to share</p>
+            </div>
+          </div>
+
+          <label className="flex items-start gap-3 p-3 rounded-xl bg-gray-800/80 border border-gray-700 cursor-pointer hover:bg-gray-800 transition">
+            <input
+              type="checkbox"
+              checked={shareAudio}
+              onChange={(e) => setShareAudio(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded"
+            />
+            <div>
+              <p className="text-sm font-medium text-white">Also share all audio outputs</p>
+              <p className="text-xs text-gray-400 mt-0.5">Share your computer&apos;s audio along with the screen</p>
+            </div>
+          </label>
+
+          <div className="flex gap-3 mt-5">
+            <button
+              onClick={() => setShowShareDialog(false)}
+              className="flex-1 py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowShareDialog(false);
+                toggleScreenShare(shareAudio);
+              }}
+              className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition text-sm font-medium"
+            >
+              Start Sharing
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
