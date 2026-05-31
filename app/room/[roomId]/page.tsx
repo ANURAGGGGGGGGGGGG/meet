@@ -91,19 +91,25 @@ export default function Room() {
 
   if (!joined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 p-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-6">
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gray-950 p-4">
+        <div className="orb w-[500px] h-[500px] bg-blue-500/20 -top-32 -left-32 animate-gradient-shift" />
+        <div className="orb w-[400px] h-[400px] bg-purple-500/15 bottom-10 -right-20 animate-gradient-shift" style={{ animationDelay: "-4s" }} />
+
+        <div className="w-full max-w-md relative z-10">
+          <div className="text-center mb-10 animate-slide-up">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25 mb-6 animate-float">
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Join Meeting</h1>
-            <p className="text-gray-400">You&apos;re about to join room <span className="text-blue-400 font-mono">{roomId}</span></p>
+            <h1 className="text-4xl font-bold mb-2 text-gradient">Join Meeting</h1>
+            <p className="text-gray-400">You&apos;re about to join room <span className="text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded-md">{roomId}</span></p>
           </div>
 
-          <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-800 shadow-2xl">
+          <div
+            className="bg-gray-900/70 backdrop-blur-xl rounded-3xl p-8 border border-gray-800/60 shadow-2xl shadow-black/30 animate-slide-up"
+            style={{ animationDelay: "0.15s", animationFillMode: "both" }}
+          >
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-300 mb-2">Your Name</label>
               <input
@@ -111,15 +117,16 @@ export default function Room() {
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
                 placeholder="Enter your name"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300"
                 onKeyDown={(e) => e.key === "Enter" && handleJoinNow()}
               />
             </div>
 
             <button
               onClick={handleJoinNow}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition flex items-center justify-center gap-2"
+              className="relative group w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 hover:shadow-blue-500/40"
             >
+              <div className="absolute inset-0 rounded-xl bg-white/0 group-hover:bg-white/10 transition-colors duration-300" />
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
@@ -127,7 +134,9 @@ export default function Room() {
             </button>
           </div>
 
-          <p className="text-center text-gray-600 text-xs mt-6">End-to-end encrypted. No data stored.</p>
+          <p className="text-center text-gray-600 text-xs mt-6 animate-fade-in" style={{ animationDelay: "0.4s", animationFillMode: "both" }}>
+            End-to-end encrypted &middot; No data stored
+          </p>
         </div>
       </div>
     );
@@ -136,9 +145,10 @@ export default function Room() {
   if (connectionError) {
     const isMediaError = connectionError === "no-media";
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md text-center">
-          <div className="w-16 h-16 rounded-full bg-yellow-900/50 border border-yellow-800 flex items-center justify-center mx-auto mb-4">
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gray-950 p-4">
+        <div className="orb w-[400px] h-[400px] bg-yellow-500/10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-float-slow" />
+        <div className="bg-gray-900/70 backdrop-blur-xl border border-gray-800/60 rounded-3xl p-8 max-w-md text-center shadow-2xl shadow-black/30 relative z-10">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-800/30 flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
             </svg>
@@ -154,13 +164,13 @@ export default function Room() {
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => { setConnectionError(null); hasAddedLocal.current = false; window.location.reload(); }}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition text-sm font-medium"
+              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl transition-all duration-300 text-sm font-medium shadow-lg shadow-blue-600/20"
             >
               Try Again
             </button>
             <button
               onClick={() => router.push("/")}
-              className="px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition text-sm font-medium"
+              className="px-6 py-2.5 bg-gray-800 hover:bg-gray-700/80 border border-gray-700/50 text-white rounded-xl transition-all duration-300 text-sm font-medium"
             >
               Go Home
             </button>
@@ -175,8 +185,13 @@ export default function Room() {
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col relative">
           {connectionStatus === "connecting" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-950/90 z-20">
-              <div className="text-center">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-950/80 backdrop-blur-sm z-20">
+              <div className="text-center animate-fade-in">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25 mb-6 animate-float">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
                 <div className="flex items-center justify-center gap-1 mb-4">
                   <span className="w-3 h-3 bg-blue-500 rounded-full animate-pulse-dot" />
                   <span className="w-3 h-3 bg-blue-500 rounded-full animate-pulse-dot" />
@@ -212,7 +227,7 @@ export default function Room() {
         </div>
 
         {showChat && (
-          <div className="w-full sm:w-80 lg:w-96 border-l border-gray-800 bg-gray-900/50 flex flex-col">
+          <div className="w-full sm:w-80 lg:w-96 border-l border-gray-800/60 bg-gray-900/50 backdrop-blur-sm flex flex-col animate-slide-up">
             <Chat messages={messages} onSend={sendMessage} onClose={() => setShowChat(false)} />
           </div>
         )}

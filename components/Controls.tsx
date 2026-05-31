@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { MediaState } from "@/hooks/useWebRTC";
+import BorderGlow from "./BorderGlow";
 
 type Props = {
   mediaState: MediaState;
@@ -33,17 +34,24 @@ export default function Controls({
 }: Props) {
   const [shareAudio, setShareAudio] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLink = () => {
+    copyInviteLink();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <>
-    <div className="px-4 py-3 bg-gray-900/80 backdrop-blur-md border-t border-gray-800">
+    <div className="px-4 py-3 bg-gray-900/80 backdrop-blur-md border-t border-gray-800/60">
       <div className="max-w-3xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
         <ControlButton
           active={mediaState.mic}
           onClick={toggleMic}
           label={mediaState.mic ? "Mute" : "Unmute"}
-          activeColor="bg-gray-700 hover:bg-gray-600"
-          inactiveColor="bg-red-600 hover:bg-red-700"
+          activeColor="bg-gray-700 hover:bg-gray-600 hover:shadow-lg hover:shadow-gray-700/20"
+          inactiveColor="bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20"
         >
           {mediaState.mic ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -60,8 +68,8 @@ export default function Controls({
           active={mediaState.camera}
           onClick={toggleCamera}
           label={mediaState.camera ? "Stop Camera" : "Start Camera"}
-          activeColor="bg-gray-700 hover:bg-gray-600"
-          inactiveColor="bg-red-600 hover:bg-red-700"
+          activeColor="bg-gray-700 hover:bg-gray-600 hover:shadow-lg hover:shadow-gray-700/20"
+          inactiveColor="bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20"
         >
           {mediaState.camera ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,7 +93,7 @@ export default function Controls({
               }
             }}
             label={mediaState.screen ? "Stop Share" : "Share Screen"}
-            activeColor="bg-gray-700 hover:bg-gray-600"
+            activeColor="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30"
             inactiveColor="bg-gray-700 hover:bg-gray-600"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,7 +106,7 @@ export default function Controls({
           active={autoFrame}
           onClick={toggleAutoFrame}
           label={autoFrame ? "Disable Auto Frame" : "Enable Auto Frame"}
-          activeColor="bg-blue-600 hover:bg-blue-700"
+          activeColor="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-600/30"
           inactiveColor="bg-gray-700 hover:bg-gray-600"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,7 +119,7 @@ export default function Controls({
             active={showChat}
             onClick={() => setShowChat(!showChat)}
             label="Chat"
-            activeColor="bg-blue-600 hover:bg-blue-700"
+            activeColor="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-600/30"
             inactiveColor="bg-gray-700 hover:bg-gray-600"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,29 +127,35 @@ export default function Controls({
             </svg>
           </ControlButton>
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-lg shadow-red-500/30">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </div>
 
-        <div className="mx-2 h-8 w-px bg-gray-800" />
+        <div className="mx-2 h-8 w-px bg-gray-800/60" />
 
         <ControlButton
           active={false}
-          onClick={copyInviteLink}
-          label="Copy Link"
-          activeColor="bg-gray-700 hover:bg-gray-600"
-          inactiveColor="bg-gray-700 hover:bg-gray-600"
+          onClick={handleCopyLink}
+          label={copied ? "Copied!" : "Copy Link"}
+          activeColor={copied ? "bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20" : "bg-gray-700 hover:bg-gray-600"}
+          inactiveColor={copied ? "bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20" : "bg-gray-700 hover:bg-gray-600"}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-          </svg>
+          {copied ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          )}
         </ControlButton>
 
         <button
           onClick={leaveRoom}
-          className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl transition text-sm font-medium flex items-center gap-2"
+          className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all duration-300 text-sm font-medium flex items-center gap-2 shadow-lg shadow-red-600/20 hover:shadow-red-500/40"
           title="Leave meeting"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,51 +167,64 @@ export default function Controls({
     </div>
 
     {showShareDialog && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+        <BorderGlow
+          edgeSensitivity={30}
+          glowColor="40 80 80"
+          backgroundColor="#030712"
+          borderRadius={24}
+          glowRadius={40}
+          glowIntensity={1}
+          coneSpread={25}
+          animated={false}
+          colors={["#c084fc", "#f472b6", "#38bdf8"]}
+          className="w-full max-w-sm mx-4 animate-slide-up"
+        >
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-600/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Share Screen</h3>
+                <p className="text-sm text-gray-400">Choose what to share</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Share Screen</h3>
-              <p className="text-sm text-gray-400">Choose what to share</p>
+
+            <label className="flex items-start gap-3 p-3 rounded-xl bg-gray-800/80 border border-gray-700/50 cursor-pointer hover:bg-gray-800 transition-all duration-300">
+              <input
+                type="checkbox"
+                checked={shareAudio}
+                onChange={(e) => setShareAudio(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded accent-blue-500"
+              />
+              <div>
+                <p className="text-sm font-medium text-white">Also share all audio outputs</p>
+                <p className="text-xs text-gray-400 mt-0.5">Share your computer&apos;s audio along with the screen</p>
+              </div>
+            </label>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setShowShareDialog(false)}
+                className="flex-1 py-2.5 px-4 bg-gray-800 hover:bg-gray-700/80 border border-gray-700/50 text-white rounded-xl transition-all duration-300 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowShareDialog(false);
+                  toggleScreenShare(shareAudio);
+                }}
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl transition-all duration-300 text-sm font-medium shadow-lg shadow-blue-600/20"
+              >
+                Start Sharing
+              </button>
             </div>
           </div>
-
-          <label className="flex items-start gap-3 p-3 rounded-xl bg-gray-800/80 border border-gray-700 cursor-pointer hover:bg-gray-800 transition">
-            <input
-              type="checkbox"
-              checked={shareAudio}
-              onChange={(e) => setShareAudio(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded"
-            />
-            <div>
-              <p className="text-sm font-medium text-white">Also share all audio outputs</p>
-              <p className="text-xs text-gray-400 mt-0.5">Share your computer&apos;s audio along with the screen</p>
-            </div>
-          </label>
-
-          <div className="flex gap-3 mt-5">
-            <button
-              onClick={() => setShowShareDialog(false)}
-              className="flex-1 py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl transition text-sm font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                setShowShareDialog(false);
-                toggleScreenShare(shareAudio);
-              }}
-              className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition text-sm font-medium"
-            >
-              Start Sharing
-            </button>
-          </div>
-        </div>
+        </BorderGlow>
       </div>
     )}
     </>
@@ -222,7 +249,7 @@ function ControlButton({
   return (
     <button
       onClick={onClick}
-      className={`p-2.5 rounded-xl transition text-white ${active ? activeColor : inactiveColor}`}
+      className={`p-2.5 rounded-xl transition-all duration-300 text-white ${active ? activeColor : inactiveColor}`}
       title={label}
     >
       {children}
