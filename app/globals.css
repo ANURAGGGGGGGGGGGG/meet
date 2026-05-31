@@ -137,3 +137,51 @@ body {
   filter: blur(80px);
   pointer-events: none;
 }
+
+.btn-ctrl {
+  background: none;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-sizing: border-box;
+  color: #fff;
+  display: block;
+  height: 40px;
+  overflow: hidden;
+  position: relative;
+  width: 40px;
+  flex-shrink: 0;
+}
+.btn-ctrl:hover {
+  animation: ctrl-pulse 0.6s;
+  box-shadow: 0 0 0 2em transparent;
+}
+@keyframes ctrl-pulse {
+  0% { box-shadow: 0 0 0 0 #fff; }
+}
+.btn-ctrl svg {
+  --size: 18px;
+  display: block;
+  height: var(--size);
+  left: calc(50% - var(--size) / 2);
+  position: absolute;
+  top: calc(50% - var(--size) / 2);
+  width: var(--size);
+}
+.btn-ctrl::before {
+  background: var(--ctrl-bg, #2a2a2a);
+  border-radius: 50%;
+  content: "";
+  inset: 2px;
+  position: absolute;
+}
+.btn-ctrl:hover svg,
+.btn-ctrl:hover::before {
+  animation: ctrl-move 0.5s;
+}
+@keyframes ctrl-move {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(100%); }
+  51% { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+

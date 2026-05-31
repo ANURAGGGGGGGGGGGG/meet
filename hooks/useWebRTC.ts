@@ -58,7 +58,7 @@ export default function useWebRTC(roomId: string, userName: string) {
 
   const localStream = useRef<MediaStream | null>(null);
   const screenStream = useRef<MediaStream | null>(null);
-  const screenSenders = useRef<Map<string, RTCRtpSender>>(new Map());
+  const screenSenders = useRef<Map<string, RTCRtpSender[]>>(new Map());
   const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
   const socket = useRef<Socket | null>(null);
   const listenersAttached = useRef(false);
@@ -300,11 +300,65 @@ export default function useWebRTC(roomId: string, userName: string) {
       }
 
       setConnectionStatus("connected");
+
+      const audioCtx = new AudioContext();
+      if (audioCtx.state === "suspended") {
+        try { audioCtx.resume(); } catch {}
+      }
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      let running = true;
+
+      function detect() {
+        if (!running) return;
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const volume = data.reduce((a, b) => a + b, 0) / data.length;
+
+        if (volume > 20) {
+          if (speakingOffTimer.current) {
+            clearTimeout(speakingOffTimer.current);
+            speakingOffTimer.current = null;
+          }
+          if (!speakingOnTimer.current) {
+            speakingOnTimer.current = setTimeout(() => {
+              setIsSpeaking(true);
+              isSpeakingRef.current = true;
+            }, 2000);
+          }
+        } else {
+          if (speakingOnTimer.current) {
+            clearTimeout(speakingOnTimer.current);
+            speakingOnTimer.current = null;
+          }
+          if (isSpeakingRef.current && !speakingOffTimer.current) {
+            speakingOffTimer.current = setTimeout(() => {
+              setIsSpeaking(false);
+              isSpeakingRef.current = false;
+            }, 800);
+          }
+        }
+
+        requestAnimationFrame(detect);
+      }
+
+      detect();
+
+      detectCleanup.current = () => {
+        running = false;
+        if (speakingOnTimer.current) clearTimeout(speakingOnTimer.current);
+        if (speakingOffTimer.current) clearTimeout(speakingOffTimer.current);
+        audioCtx.close();
+      };
     }
 
     init();
 
     return () => {
+      detectCleanup.current?.();
       clearTimeout(timeoutId);
       s.off("connect_error");
       listenersAttached.current = false;
@@ -365,10 +419,12 @@ export default function useWebRTC(roomId: string, userName: string) {
 
   const toggleScreenShare = useCallback(async (shareAudio?: boolean) => {
     if (mediaState.screen) {
-      for (const [peerId, sender] of screenSenders.current) {
+      for (const [peerId, senders] of screenSenders.current) {
         const pc = peerConnections.current[peerId];
         if (pc) {
-          pc.removeTrack(sender);
+          for (const sender of senders) {
+            pc.removeTrack(sender);
+          }
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           sendSignal(peerId, { type: "offer", sdp: pc.localDescription });
@@ -394,12 +450,21 @@ export default function useWebRTC(roomId: string, userName: string) {
         setMediaState((prev) => ({ ...prev, screen: true }));
         socket.current?.emit("screen-share-started", { roomId });
 
-        const screenTrack = stream.getVideoTracks()[0];
-        const screenMs = new MediaStream([screenTrack]);
+        const screenVideoTrack = stream.getVideoTracks()[0];
+        const screenTracks: MediaStreamTrack[] = [screenVideoTrack];
+        if (shareAudio) {
+          const audioTrack = stream.getAudioTracks()[0];
+          if (audioTrack) screenTracks.push(audioTrack);
+        }
+        const screenMs = new MediaStream(screenTracks);
 
         for (const [peerId, pc] of Object.entries(peerConnections.current)) {
-          const sender = pc.addTrack(screenTrack, screenMs);
-          screenSenders.current.set(peerId, sender);
+          const senders: RTCRtpSender[] = [];
+          for (const track of screenMs.getTracks()) {
+            const sender = pc.addTrack(track, screenMs);
+            senders.push(sender);
+          }
+          screenSenders.current.set(peerId, senders);
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           sendSignal(peerId, { type: "offer", sdp: pc.localDescription });
@@ -419,17 +484,7 @@ export default function useWebRTC(roomId: string, userName: string) {
           ];
         });
 
-        if (shareAudio) {
-          const screenAudio = stream.getAudioTracks()[0];
-          if (screenAudio) {
-            for (const pc of Object.values(peerConnections.current)) {
-              const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-              if (sender) await sender.replaceTrack(screenAudio);
-            }
-          }
-        }
-
-        screenTrack.onended = () => {
+        screenVideoTrack.onended = () => {
           toggleScreenShareRef.current();
         };
       } catch {
@@ -459,6 +514,12 @@ export default function useWebRTC(roomId: string, userName: string) {
     [roomId],
   );
 
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const isSpeakingRef = useRef(false);
+  const speakingOnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speakingOffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detectCleanup = useRef<(() => void) | null>(null);
+
   const leaveRoom = useCallback(() => {
     Object.values(peerConnections.current).forEach((pc) => pc.close());
     peerConnections.current = {};
@@ -483,5 +544,6 @@ export default function useWebRTC(roomId: string, userName: string) {
     toggleScreenShare,
     sendMessage,
     leaveRoom,
+    isSpeaking,
   };
 }

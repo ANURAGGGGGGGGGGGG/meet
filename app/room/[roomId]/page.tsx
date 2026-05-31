@@ -37,6 +37,7 @@ export default function Room() {
     toggleScreenShare,
     sendMessage,
     leaveRoom,
+    isSpeaking,
   } = useWebRTC(joined ? roomId : "", joined ? userName : "");
 
   const hasAddedLocal = useRef(false);
@@ -68,11 +69,6 @@ export default function Room() {
     }
   }, [connectionStatus]);
 
-  usePiPAuto({
-    participants,
-    enabled: connectionStatus === "connected" && participants.length > 0,
-  });
-
   const handleLeave = useCallback(() => {
     leaveRoom();
     disconnectSocket();
@@ -83,6 +79,19 @@ export default function Room() {
     const link = `${window.location.origin}/room/${roomId}`;
     navigator.clipboard.writeText(link);
   }, [roomId]);
+
+  usePiPAuto({
+    participants,
+    enabled: connectionStatus === "connected" && participants.length > 0,
+    mediaState,
+    toggleMic,
+    toggleCamera,
+    toggleScreenShare,
+    toggleAutoFrame: () => setAutoFrame((v) => !v),
+    setShowChat,
+    copyInviteLink,
+    leaveRoom: handleLeave,
+  });
 
   const handleJoinNow = useCallback(() => {
     if (!userName.trim()) return;
@@ -223,6 +232,7 @@ export default function Room() {
             unreadCount={unreadCount}
             autoFrame={autoFrame}
             toggleAutoFrame={() => setAutoFrame((v) => !v)}
+            isSpeaking={isSpeaking}
           />
         </div>
 

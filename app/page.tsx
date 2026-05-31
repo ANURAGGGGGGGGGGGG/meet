@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Orb from "@/components/Orb";
 import BorderGlow from "@/components/BorderGlow";
 
+
 export default function Landing() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -107,7 +108,7 @@ export default function Landing() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  New Meeting
+                  + New Meeting
                 </>
               )}
             </button>
