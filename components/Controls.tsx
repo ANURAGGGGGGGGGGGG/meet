@@ -15,8 +15,6 @@ type Props = {
   copyInviteLink: () => void;
   participantCount: number;
   unreadCount?: number;
-  autoFrame: boolean;
-  toggleAutoFrame: () => void;
   isSpeaking?: boolean;
 };
 
@@ -30,8 +28,6 @@ export default function Controls({
   leaveRoom,
   copyInviteLink,
   unreadCount = 0,
-  autoFrame,
-  toggleAutoFrame,
   isSpeaking,
 }: Props) {
   const [shareAudio, setShareAudio] = useState(false);
@@ -100,12 +96,6 @@ export default function Controls({
           </ControlButton>
         </div>
 
-        <ControlButton active={autoFrame} onClick={toggleAutoFrame} label={autoFrame ? "Disable Auto Frame" : "Enable Auto Frame"}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-          </svg>
-        </ControlButton>
-
         <div className="relative">
           <ControlButton active={showChat} onClick={() => setShowChat(!showChat)} label="Chat">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,6 +159,59 @@ export default function Controls({
 
     {showShareDialog && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+        <style>{`
+          .wrap-check-63 input[type=checkbox] { display: none; }
+          .wrap-check-63 label span {
+            display: inline-block;
+            position: relative;
+            background-color: transparent;
+            width: 22px;
+            height: 22px;
+            transform-origin: center;
+            border: 2px solid #6b7280;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 2px;
+            transition: background-color 150ms 200ms, transform 350ms cubic-bezier(0.78, -1.22, 0.17, 1.89);
+          }
+          .wrap-check-63 label span:before {
+            content: "";
+            width: 0px;
+            height: 2px;
+            border-radius: 2px;
+            background: #6b7280;
+            position: absolute;
+            transform: rotate(45deg);
+            top: 11px;
+            left: 7px;
+            transition: width 50ms ease 50ms;
+            transform-origin: 0% 0%;
+          }
+          .wrap-check-63 label span:after {
+            content: "";
+            width: 0;
+            height: 2px;
+            border-radius: 2px;
+            background: #6b7280;
+            position: absolute;
+            transform: rotate(305deg);
+            top: 14px;
+            left: 8px;
+            transition: width 50ms ease;
+            transform-origin: 0% 0%;
+          }
+          .wrap-check-63 label:hover span:before { width: 5px; transition: width 100ms ease; }
+          .wrap-check-63 label:hover span:after { width: 10px; transition: width 150ms ease 100ms; }
+          .wrap-check-63 input[type=checkbox]:checked + label span {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+            transform: scale(1.15);
+          }
+          .wrap-check-63 input[type=checkbox]:checked + label span:after,
+          .wrap-check-63 input[type=checkbox]:checked + label span:before { background: #fff; }
+          .wrap-check-63 input[type=checkbox]:checked + label span:after { width: 10px; transition: width 150ms ease 100ms; }
+          .wrap-check-63 input[type=checkbox]:checked + label span:before { width: 5px; transition: width 150ms ease 100ms; }
+        `}</style>
         <BorderGlow
           edgeSensitivity={30}
           glowColor="40 80 80"
@@ -194,18 +237,16 @@ export default function Controls({
               </div>
             </div>
 
-            <label className="flex items-start gap-3 p-3 rounded-xl bg-gray-800/80 border border-gray-700/50 cursor-pointer hover:bg-gray-800 transition-all duration-300">
-              <input
-                type="checkbox"
-                checked={shareAudio}
-                onChange={(e) => setShareAudio(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded accent-blue-500"
-              />
-              <div>
-                <p className="text-sm font-medium text-white">Also share all audio outputs</p>
-                <p className="text-xs text-gray-400 mt-0.5">Share your computer&apos;s audio along with the screen</p>
-              </div>
-            </label>
+            <div className="wrap-check-63 flex items-start gap-3 p-3 rounded-xl bg-gray-800/80 border border-gray-700/50 cursor-pointer hover:bg-gray-800 transition-all duration-300">
+              <input type="checkbox" id="check-63" checked={shareAudio} onChange={(e) => setShareAudio(e.target.checked)} />
+              <label htmlFor="check-63" className="flex items-start gap-3 cursor-pointer">
+                <span></span>
+                <div>
+                  <p className="text-sm font-medium text-white">Also share all audio outputs</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Share your computer&apos;s audio along with the screen</p>
+                </div>
+              </label>
+            </div>
 
             <div className="flex gap-3 mt-5">
               <button

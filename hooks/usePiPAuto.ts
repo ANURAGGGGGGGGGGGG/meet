@@ -10,7 +10,6 @@ type PiPOptions = {
   toggleMic?: () => void;
   toggleCamera?: () => void;
   toggleScreenShare?: (shareAudio?: boolean) => void;
-  toggleAutoFrame?: () => void;
   setShowChat?: (v: boolean) => void;
   copyInviteLink?: () => void;
   leaveRoom?: () => void;
@@ -34,7 +33,7 @@ const CONTROL_STYLE = `
   .controls-bar { position:absolute; bottom:0; left:0; right:0; display:flex; align-items:center; justify-content:center; gap:8px; padding:12px 8px; background:linear-gradient(transparent,rgba(0,0,0,0.85)); }
 `;
 
-export function usePiPAuto({ participants, enabled = true, mediaState, toggleMic, toggleCamera, toggleScreenShare, toggleAutoFrame, setShowChat, copyInviteLink, leaveRoom }: PiPOptions) {
+export function usePiPAuto({ participants, enabled = true, mediaState, toggleMic, toggleCamera, toggleScreenShare, setShowChat, copyInviteLink, leaveRoom }: PiPOptions) {
   const pipWindowRef = useRef<Window | null>(null);
   const participantsRef = useRef(participants);
   const mediaStateRef = useRef(mediaState);
@@ -80,53 +79,123 @@ export function usePiPAuto({ participants, enabled = true, mediaState, toggleMic
             .tile video { width: 100%; height: 100%; object-fit: cover; }
             .tile .label { position: absolute; bottom: 4px; left: 4px; padding: 2px 8px; background: rgba(0,0,0,0.7); border-radius: 6px; font: 11px system-ui, sans-serif; color: #d1d5db; pointer-events: none; white-space: nowrap; }
             .avatar { width: 40px; height: 40px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; color: white; font: bold 14px system-ui, sans-serif; }
+            .pip-strip { position: absolute; bottom: 66px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 10; }
+            .pip-strip-tile { width: 80px; height: 60px; border-radius: 8px; overflow: hidden; background: #111827; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.15); }
+            .pip-strip-tile video { width: 100%; height: 100%; object-fit: cover; }
+            .pip-strip-label { position: absolute; bottom: 2px; left: 2px; padding: 1px 5px; background: rgba(0,0,0,0.7); border-radius: 4px; font: 9px system-ui, sans-serif; color: #d1d5db; pointer-events: none; white-space: nowrap; }
+            .pip-strip-avatar { width: 24px; height: 24px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; color: white; font: bold 10px system-ui, sans-serif; }
+            .pip-screen-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
           </style>`;
-
-          const grid = pipWindow.document.createElement("div");
-          grid.className = "grid";
 
           const currentParticipants = participantsRef.current;
 
-          for (const p of currentParticipants) {
-            const hasVideo = p.stream
-              ?.getVideoTracks()
-              ?.some((t) => t.enabled);
+          const screenShareParticipant = currentParticipants.find((p) => p.sharingScreen);
+          const screenStream = screenShareParticipant?.stream;
+          const hasScreenVideo = screenStream?.getVideoTracks()?.some((t) => t.enabled);
 
-            const tile = pipWindow.document.createElement("div");
-            tile.className = "tile";
+          if (screenShareParticipant && hasScreenVideo) {
+            const screenVideo = pipWindow.document.createElement("video");
+            screenVideo.srcObject = screenStream!;
+            screenVideo.autoplay = true;
+            screenVideo.playsInline = true;
+            screenVideo.muted = true;
+            screenVideo.className = "pip-screen-bg";
+            pipWindow.document.body.appendChild(screenVideo);
 
-            if (hasVideo && p.stream) {
-              const video = pipWindow.document.createElement("video");
-              video.srcObject = p.stream;
-              video.autoplay = true;
-              video.playsInline = true;
-              video.muted = !!p.isLocal;
-              if (p.isLocal) video.style.transform = "scaleX(-1)";
-              tile.appendChild(video);
-            } else {
-              const avatar = pipWindow.document.createElement("div");
-              avatar.className = "avatar";
-              const initials = p.name
-                .split(" ")
-                .map((w) => w[0])
-                .join("")
-                .toUpperCase()
-                .slice(0, 2) || "?";
-              avatar.textContent = initials;
-              tile.appendChild(avatar);
+            const otherParticipants = currentParticipants.filter(
+              (p) => p.id !== screenShareParticipant.id,
+            );
+
+            if (otherParticipants.length > 0) {
+              const strip = pipWindow.document.createElement("div");
+              strip.className = "pip-strip";
+
+              for (const p of otherParticipants) {
+                const tile = pipWindow.document.createElement("div");
+                tile.className = "pip-strip-tile";
+
+                const hasVideo = p.stream
+                  ?.getVideoTracks()
+                  ?.some((t) => t.enabled);
+
+                if (hasVideo && p.stream) {
+                  const video = pipWindow.document.createElement("video");
+                  video.srcObject = p.stream;
+                  video.autoplay = true;
+                  video.playsInline = true;
+                  video.muted = !!p.isLocal;
+                  if (p.isLocal) video.style.transform = "scaleX(-1)";
+                  tile.appendChild(video);
+                } else {
+                  const avatar = pipWindow.document.createElement("div");
+                  avatar.className = "pip-strip-avatar";
+                  const initials = p.name
+                    .split(" ")
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2) || "?";
+                  avatar.textContent = initials;
+                  tile.appendChild(avatar);
+                }
+
+                if (p.name) {
+                  const label = pipWindow.document.createElement("div");
+                  label.className = "pip-strip-label";
+                  label.textContent = p.isLocal ? "You" : p.name;
+                  tile.appendChild(label);
+                }
+
+                strip.appendChild(tile);
+              }
+
+              pipWindow.document.body.appendChild(strip);
+            }
+          } else {
+            const grid = pipWindow.document.createElement("div");
+            grid.className = "grid";
+
+            for (const p of currentParticipants) {
+              const hasVideo = p.stream
+                ?.getVideoTracks()
+                ?.some((t) => t.enabled);
+
+              const tile = pipWindow.document.createElement("div");
+              tile.className = "tile";
+
+              if (hasVideo && p.stream) {
+                const video = pipWindow.document.createElement("video");
+                video.srcObject = p.stream;
+                video.autoplay = true;
+                video.playsInline = true;
+                video.muted = !!p.isLocal;
+                if (p.isLocal) video.style.transform = "scaleX(-1)";
+                tile.appendChild(video);
+              } else {
+                const avatar = pipWindow.document.createElement("div");
+                avatar.className = "avatar";
+                const initials = p.name
+                  .split(" ")
+                  .map((w) => w[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2) || "?";
+                avatar.textContent = initials;
+                tile.appendChild(avatar);
+              }
+
+              if (p.name) {
+                const label = pipWindow.document.createElement("div");
+                label.className = "label";
+                label.textContent = p.isLocal ? "You" : p.name;
+                tile.appendChild(label);
+              }
+
+              grid.appendChild(tile);
             }
 
-            if (p.name) {
-              const label = pipWindow.document.createElement("div");
-              label.className = "label";
-              label.textContent = p.isLocal ? "You" : p.name;
-              tile.appendChild(label);
-            }
-
-            grid.appendChild(tile);
+            pipWindow.document.body.appendChild(grid);
           }
-
-          pipWindow.document.body.appendChild(grid);
 
           const controlsStyle = pipWindow.document.createElement("style");
           controlsStyle.textContent = CONTROL_STYLE;

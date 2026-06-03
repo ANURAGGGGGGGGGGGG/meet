@@ -11,7 +11,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "^0.10.35",
     "next": "16.2.6",
     "ogl": "^1.0.11",
     "react": "19.2.4",

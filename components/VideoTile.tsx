@@ -1,20 +1,18 @@
 "use client";
 
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef } from "react";
 import type { Participant } from "@/hooks/useWebRTC";
-import type { FaceDetector } from "@mediapipe/tasks-vision";
 
 type Props = {
   participant: Participant;
   isLocal?: boolean;
   localStream?: MediaStream | null;
-  enableAutoFrame?: boolean;
+  selected?: boolean;
+  onClick?: () => void;
 };
 
-export default function VideoTile({ participant, isLocal, localStream, enableAutoFrame }: Props) {
+export default function VideoTile({ participant, isLocal, localStream, selected, onClick }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const detectorRef = useRef<FaceDetector | null>(null);
-  const rafRef = useRef<number>(0);
 
   const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node;
@@ -23,72 +21,10 @@ export default function VideoTile({ participant, isLocal, localStream, enableAut
     if (stream) {
       node.srcObject = stream;
     }
+    if (isLocal) {
+      node.style.transform = "scaleX(-1)";
+    }
   }, [isLocal, localStream, participant.stream]);
-
-  useEffect(() => {
-    if (!isLocal || !enableAutoFrame) return;
-
-    const origError = console.error;
-    console.error = (...args: Parameters<typeof console.error>) => {
-      if (typeof args[0] === "string" && args[0].includes("TensorFlow Lite XNNPACK")) return;
-      origError.apply(console, args);
-    };
-
-    let cancelled = false;
-
-    const init = async () => {
-      const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
-
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
-      );
-
-      if (cancelled) return;
-
-      detectorRef.current = await FaceDetector.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
-        },
-        runningMode: "VIDEO",
-      });
-
-      if (!cancelled) loop();
-    };
-
-    const loop = () => {
-      const video = videoRef.current;
-      if (!video || !detectorRef.current) {
-        rafRef.current = requestAnimationFrame(loop);
-        return;
-      }
-
-      const results = detectorRef.current.detectForVideo(video, performance.now());
-
-      if (results.detections.length > 0) {
-        const face = results.detections[0];
-        const box = face.boundingBox;
-        if (!box) return;
-        const scale = video.clientWidth / video.videoWidth;
-        let centerX = (box.originX + box.width / 2) * scale;
-        if (isLocal) centerX = video.clientWidth - centerX;
-        const containerWidth = video.parentElement?.clientWidth ?? window.innerWidth;
-        const offset = containerWidth / 2 - centerX;
-        video.style.transform = `translateX(${offset}px)`;
-      }
-
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    init();
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(rafRef.current);
-      detectorRef.current?.close();
-      console.error = origError;
-    };
-  }, [isLocal, enableAutoFrame]);
 
   const initials = participant.name
     ? participant.name
@@ -110,7 +46,14 @@ export default function VideoTile({ participant, isLocal, localStream, enableAut
   const showAvatar = !hasVideo;
 
   return (
-    <div className="relative bg-gray-900 rounded-2xl overflow-hidden flex items-center justify-center min-h-[200px] sm:min-h-[240px] border border-gray-800/50 group transition-all duration-500 hover:border-gray-700/80 hover:shadow-lg hover:shadow-black/20">
+    <div
+      onClick={onClick}
+      className={
+        selected
+          ? "absolute inset-0 bg-gray-950 flex items-center justify-center"
+          : "relative bg-gray-900 rounded-2xl overflow-hidden flex items-center justify-center min-h-[200px] sm:min-h-[240px] border border-gray-800/50 group transition-all duration-500 hover:border-gray-700/80 hover:shadow-lg hover:shadow-black/20 cursor-pointer"
+      }
+    >
       {showAvatar ? (
         <div className="flex flex-col items-center gap-3">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20 flex items-center justify-center text-xl font-bold text-white">
@@ -125,7 +68,7 @@ export default function VideoTile({ participant, isLocal, localStream, enableAut
             autoPlay
             playsInline
             muted={isLocal}
-            className={`w-full h-full object-cover transition-all duration-500 ${isLocal ? "scale-x-[-1]" : ""}`}
+            className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute bottom-3 left-3 flex items-center gap-2">
             <span className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-lg text-xs text-gray-200 border border-white/5">
@@ -155,6 +98,18 @@ export default function VideoTile({ participant, isLocal, localStream, enableAut
           </svg>
           Screen
         </div>
+      )}
+
+      {selected && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+          className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/80 transition-all duration-200"
+          title="Minimize"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       )}
     </div>
   );
